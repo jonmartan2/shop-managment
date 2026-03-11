@@ -1,28 +1,20 @@
+use Shop::{load_data, save_data, Item, Sale, StoredData};
 use axum::{
     Router,
-    extract::{Json as ExtractJson, Multipart, Path, State},
+    extract::{Multipart, Path, State, Json},
     http::StatusCode,
     response::{Html, IntoResponse},
     routing::{get, post},
+    Json as AxumJson,
 };
-use bincode::{deserialize, serialize};
-use serde::{Deserialize, Serialize};
+use chrono::Utc;
+use serde::Deserialize;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::services::ServeDir;
 use uuid::Uuid;
-
-#[derive(Serialize, Deserialize, Clone)]
-struct Item {
-    id: u32,
-    image: String,
-    name: String,
-    price: f64,
-    quantity: u32,
-    sold: u32,
-}
 
 #[derive(Deserialize)]
 struct NewItem {
@@ -32,39 +24,14 @@ struct NewItem {
     quantity: u32,
 }
 
-#[derive(Serialize, Deserialize)]
-struct StoredData {
-    next_id: u32,
-    items: Vec<Item>,
+#[derive(Deserialize)]
+struct SellRequest {
+    quantity: u32,
 }
 
 #[derive(Clone)]
 struct AppState {
     data: Arc<Mutex<StoredData>>,
-    file_path: String,
-}
-
-fn load_data(path: &str) -> StoredData {
-    if let Ok(mut file) = File::open(path) {
-        let mut buf = Vec::new();
-        if file.read_to_end(&mut buf).is_ok() {
-            if let Ok(data) = deserialize(&buf) {
-                return data;
-            }
-        }
-    }
-    StoredData {
-        next_id: 0,
-        items: Vec::new(),
-    }
-}
-
-fn save_data(path: &str, data: &StoredData) {
-    if let Ok(mut file) = File::create(path) {
-        if let Ok(serialized) = serialize(data) {
-            let _ = file.write_all(&serialized);
-        }
-    }
 }
 
 #[tokio::main]
@@ -72,18 +39,17 @@ async fn main() {
     // Ensure uploads directory exists
     fs::create_dir_all("static/uploads").unwrap();
 
-    let file_path = "items.bin".to_string();
-    let mut stored_data = load_data(&file_path);
+    let stored_data = load_data();
 
     let state = AppState {
         data: Arc::new(Mutex::new(stored_data)),
-        file_path,
     };
 
     let app = Router::new()
         .route("/", get(serve_page))
         .route("/items", get(get_items).post(add_item))
         .route("/items/:id/sell", post(sell_item))
+        .route("/sales", get(get_sales))
         .route("/upload", post(upload_image))
         .nest_service("/static", ServeDir::new("static"))
         .with_state(state);
@@ -99,12 +65,17 @@ async fn serve_page() -> Html<String> {
 
 async fn get_items(State(state): State<AppState>) -> impl IntoResponse {
     let data = state.data.lock().await;
-    (StatusCode::OK, axum::Json(data.items.clone()))
+    AxumJson(data.items.clone())
+}
+
+async fn get_sales(State(state): State<AppState>) -> impl IntoResponse {
+    let data = state.data.lock().await;
+    AxumJson(data.sales.clone())
 }
 
 async fn add_item(
     State(state): State<AppState>,
-    ExtractJson(new_item): ExtractJson<NewItem>,
+    Json(new_item): Json<NewItem>,
 ) -> impl IntoResponse {
     let mut data = state.data.lock().await;
     let id = data.next_id;
@@ -117,23 +88,43 @@ async fn add_item(
         quantity: new_item.quantity,
         sold: 0,
     });
-    save_data(&state.file_path, &data);
+    save_data(&data);
     StatusCode::CREATED
 }
 
-async fn sell_item(State(state): State<AppState>, Path(id): Path<u32>) -> impl IntoResponse {
+async fn sell_item(
+    State(state): State<AppState>,
+    Path(id): Path<u32>,
+    Json(req): Json<SellRequest>,
+) -> impl IntoResponse {
     let mut data = state.data.lock().await;
+
+    let next_sale_id = data.next_sale_id;
     if let Some(item) = data.items.iter_mut().find(|i| i.id == id) {
-        if item.quantity > 0 {
-            item.quantity -= 1;
-            item.sold += 1;
-            save_data(&state.file_path, &data);
-            return (StatusCode::OK, "Sold".to_string());
+        if item.quantity >= req.quantity && req.quantity > 0 {
+            item.quantity -= req.quantity;
+            item.sold += req.quantity;
+
+            let sale = Sale {
+                id: next_sale_id,
+                item_id: item.id,
+                item_name: item.name.clone(),
+                quantity: req.quantity,
+                price_at_sale: item.price,
+                timestamp: Utc::now(),
+            };
+            data.sales.push(sale);
+            data.next_sale_id += 1;
+
+            save_data(&data);
+            return (StatusCode::OK, "Sold".to_string()).into_response();
+        } else if req.quantity == 0 {
+            return (StatusCode::BAD_REQUEST, "Quantity must be > 0".to_string()).into_response();
         } else {
-            return (StatusCode::BAD_REQUEST, "Out of stock".to_string());
+            return (StatusCode::BAD_REQUEST, "Not enough stock".to_string()).into_response();
         }
     }
-    (StatusCode::NOT_FOUND, "Item not found".to_string())
+    (StatusCode::NOT_FOUND, "Item not found".to_string()).into_response()
 }
 
 async fn upload_image(mut multipart: Multipart) -> impl IntoResponse {
@@ -156,8 +147,8 @@ async fn upload_image(mut multipart: Multipart) -> impl IntoResponse {
         if !allowed.contains(&ext.as_str()) {
             return (
                 StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({ "error": "Invalid file type" })),
-            );
+                AxumJson(serde_json::json!({ "error": "Invalid file type" })),
+            ).into_response();
         }
 
         // Generate a unique filename so users can't overwrite files
@@ -172,8 +163,8 @@ async fn upload_image(mut multipart: Multipart) -> impl IntoResponse {
                     let url = format!("/static/uploads/{}", unique_name);
                     return (
                         StatusCode::OK,
-                        axum::Json(serde_json::json!({ "url": url })),
-                    );
+                        AxumJson(serde_json::json!({ "url": url })),
+                    ).into_response();
                 }
             }
             Err(_) => {}
@@ -182,6 +173,6 @@ async fn upload_image(mut multipart: Multipart) -> impl IntoResponse {
 
     (
         StatusCode::BAD_REQUEST,
-        axum::Json(serde_json::json!({ "error": "Upload failed" })),
-    )
+        AxumJson(serde_json::json!({ "error": "Upload failed" })),
+    ).into_response()
 }
