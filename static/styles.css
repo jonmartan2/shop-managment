@@ -1,3 +1,37 @@
+:root {
+    --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    --card-bg: white;
+    --text-main: #333;
+    --text-muted: #666;
+    --header-text: white;
+    --btn-primary: #764ba2;
+    --btn-primary-bg: white;
+    --badge-qty-bg: #e0e7ff;
+    --badge-qty-text: #4f46e5;
+    --badge-sold-bg: #fee2e2;
+    --badge-sold-text: #ef4444;
+    --modal-bg: white;
+    --input-border: #e0e0e0;
+    --shadow: rgba(0,0,0,0.2);
+}
+
+.dark-mode {
+    --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    --card-bg: #1f2937;
+    --text-main: #f9fafb;
+    --text-muted: #9ca3af;
+    --header-text: #f3f4f6;
+    --btn-primary: #a78bfa;
+    --btn-primary-bg: #1f2937;
+    --badge-qty-bg: #3730a3;
+    --badge-qty-text: #e0e7ff;
+    --badge-sold-bg: #991b1b;
+    --badge-sold-text: #fee2e2;
+    --modal-bg: #1f2937;
+    --input-border: #374151;
+    --shadow: rgba(0,0,0,0.5);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -6,9 +40,11 @@
 }
 
 body {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg-gradient);
     min-height: 100vh;
     padding: 20px;
+    color: var(--text-main);
+    transition: background 0.3s, color 0.3s;
 }
 
 .container {
@@ -21,7 +57,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 30px;
-    color: white;
+    color: var(--header-text);
 }
 
 h1 {
@@ -30,21 +66,21 @@ h1 {
 }
 
 .add-btn {
-    background: white;
+    background: var(--btn-primary-bg);
     border: none;
     padding: 15px 30px;
     border-radius: 50px;
     font-size: 1.1em;
     font-weight: bold;
-    color: #764ba2;
+    color: var(--btn-primary);
     cursor: pointer;
     transition: all 0.3s;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 15px var(--shadow);
 }
 
 .add-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    box-shadow: 0 6px 20px var(--shadow);
     background: #f0f0f0;
 }
 
@@ -83,10 +119,10 @@ h1 {
 }
 
 .card {
-    background: white;
+    background: var(--card-bg);
     border-radius: 15px;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 30px var(--shadow);
     transition: all 0.3s;
     cursor: pointer;
     display: flex;
@@ -96,7 +132,7 @@ h1 {
 
 .card:hover {
     transform: translateY(-10px);
-    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    box-shadow: 0 15px 40px var(--shadow);
 }
 
 .card img {
@@ -108,14 +144,14 @@ h1 {
 
 .card-content {
     padding: 20px;
-    background: white;
+    background: var(--card-bg);
     flex-grow: 1;
 }
 
 .card-title {
     font-size: 1.2em;
     font-weight: bold;
-    color: #333;
+    color: var(--text-main);
     margin-bottom: 10px;
 }
 
@@ -129,23 +165,23 @@ h1 {
 .card-stats {
     display: flex;
     justify-content: space-between;
-    color: #666;
+    color: var(--text-muted);
     font-size: 0.9em;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--input-border);
     padding-top: 10px;
 }
 
 .quantity-badge {
-    background: #e0e7ff;
-    color: #4f46e5;
+    background: var(--badge-qty-bg);
+    color: var(--badge-qty-text);
     padding: 4px 8px;
     border-radius: 20px;
     font-weight: bold;
 }
 
 .sold-badge {
-    background: #fee2e2;
-    color: #ef4444;
+    background: var(--badge-sold-bg);
+    color: var(--badge-sold-text);
     padding: 4px 8px;
     border-radius: 20px;
     font-weight: bold;
@@ -166,16 +202,17 @@ h1 {
 }
 
 .modal-content {
-    background: white;
+    background: var(--modal-bg);
     padding: 40px;
     border-radius: 20px;
     width: 90%;
     max-width: 400px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 60px var(--shadow);
+    color: var(--text-main);
 }
 
 .modal-content h2 {
-    color: #333;
+    color: var(--text-main);
     margin-bottom: 30px;
     text-align: center;
 }
@@ -184,10 +221,12 @@ h1 {
     width: 100%;
     padding: 12px;
     margin-bottom: 20px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--input-border);
     border-radius: 8px;
     font-size: 1em;
     transition: border 0.3s;
+    background: var(--card-bg);
+    color: var(--text-main);
 }
 
 .modal-content input:focus {
@@ -246,13 +285,14 @@ h1 {
 }
 
 .info-content {
-    background: white;
+    background: var(--modal-bg);
     padding: 40px;
     border-radius: 20px;
     width: 90%;
     max-width: 350px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 60px var(--shadow);
     text-align: center;
+    color: var(--text-main);
 }
 
 .info-content img {
@@ -265,7 +305,7 @@ h1 {
 }
 
 .info-content h2 {
-    color: #333;
+    color: var(--text-main);
     margin-bottom: 10px;
 }
 
@@ -277,10 +317,11 @@ h1 {
 }
 
 .info-stats {
-    background: #f5f5f5;
+    background: var(--card-bg);
     padding: 15px;
     border-radius: 10px;
     margin-bottom: 20px;
+    border: 1px solid var(--input-border);
 }
 
 .info-stats p {
@@ -352,4 +393,62 @@ h1 {
     border-radius: 5px;
     font-size: 0.8em;
     font-weight: bold;
+}
+
+/* Search button & box */
+.search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.search-icon-btn, .theme-toggle-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    line-height: 1;
+    color: inherit;
+}
+.search-icon-btn:hover, .theme-toggle-btn:hover {
+    background: rgba(0,0,0,0.08);
+}
+#searchBox {
+    display: none;
+    padding: 6px 12px;
+    border: 1.5px solid var(--input-border);
+    border-radius: 20px;
+    font-size: 14px;
+    outline: none;
+    width: 200px;
+    transition: border-color 0.2s, width 0.3s;
+    font-family: inherit;
+    direction: rtl;
+    background: var(--card-bg);
+    color: var(--text-main);
+}
+#searchBox:focus {
+    border-color: #888;
+}
+#searchBox.visible {
+    display: inline-block;
+}
+
+.sell-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sell-qty-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid var(--input-border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-main);
+    text-align: center;
+    font-size: 1em;
 }

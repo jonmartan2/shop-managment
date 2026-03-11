@@ -1,48 +1,5 @@
-use bincode::{deserialize, serialize};
-use serde::{Deserialize, Serialize};
-use std::fs::File;
-use std::io::{self, Read, Write};
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct Item {
-    id: u32,
-    image: String,
-    name: String,
-    price: f64,
-    quantity: u32,
-    sold: u32,
-}
-
-#[derive(Serialize, Deserialize)]
-struct StoredData {
-    next_id: u32,
-    items: Vec<Item>,
-}
-
-const FILE_PATH: &str = "items.bin";
-
-fn load_data() -> StoredData {
-    if let Ok(mut file) = File::open(FILE_PATH) {
-        let mut buf = Vec::new();
-        if file.read_to_end(&mut buf).is_ok() {
-            if let Ok(data) = deserialize(&buf) {
-                return data;
-            }
-        }
-    }
-    StoredData {
-        next_id: 0,
-        items: Vec::new(),
-    }
-}
-
-fn save_data(data: &StoredData) {
-    if let Ok(mut file) = File::create(FILE_PATH) {
-        if let Ok(serialized) = serialize(data) {
-            let _ = file.write_all(&serialized);
-        }
-    }
-}
+use Shop::{load_data, save_data, Item, Sale, StoredData};
+use std::io::{self, Write};
 
 fn prompt(label: &str) -> String {
     print!("{}: ", label);
@@ -231,6 +188,74 @@ fn delete_item(data: &mut StoredData) {
     }
 }
 
+fn list_sales(data: &StoredData) {
+    if data.sales.is_empty() {
+        println!("\n  (no sales recorded)\n");
+        return;
+    }
+    println!();
+    println!(
+        "  {:<5} {:<5} {:<25} {:>5} {:>10} {:<20}",
+        "SID", "IID", "Item Name", "Qty", "Total", "Timestamp"
+    );
+    println!("  {}", "-".repeat(80));
+    for sale in &data.sales {
+        println!(
+            "  {:<5} {:<5} {:<25} {:>5} {:>10} {:<20}",
+            sale.id,
+            sale.item_id,
+            sale.item_name,
+            sale.quantity,
+            format!("${:.2}", sale.price_at_sale * sale.quantity as f64),
+            sale.timestamp.format("%Y-%m-%d %H:%M:%S")
+        );
+    }
+    println!();
+}
+
+fn undo_sale(data: &mut StoredData) {
+    println!("\n── Undo Sale ──");
+    list_sales(data);
+    if data.sales.is_empty() {
+        return;
+    }
+
+    let id_str = prompt("  Enter Sale ID to undo");
+    let id: u32 = match id_str.parse() {
+        Ok(v) => v,
+        Err(_) => {
+            println!("  Invalid ID.");
+            return;
+        }
+    };
+
+    let pos = data.sales.iter().position(|s| s.id == id);
+    match pos {
+        Some(idx) => {
+            let sale = data.sales[idx].clone();
+            let confirm = prompt(&format!(
+                "  Undo sale of {} x \"{}\"? (y/N)",
+                sale.quantity, sale.item_name
+            ));
+            if confirm.to_lowercase() == "y" {
+                // Try to find the item to restore stock
+                if let Some(item) = data.items.iter_mut().find(|i| i.id == sale.item_id) {
+                    item.quantity += sale.quantity;
+                    item.sold = item.sold.saturating_sub(sale.quantity);
+                } else {
+                    println!("  ⚠️ Warning: Item with ID {} no longer exists. Only removing sale record.", sale.item_id);
+                }
+                data.sales.remove(idx);
+                save_data(data);
+                println!("  ✅ Sale {} undone.\n", id);
+            } else {
+                println!("  Cancelled.\n");
+            }
+        }
+        None => println!("  Sale with ID {} not found.\n", id),
+    }
+}
+
 fn main() {
     println!("╔══════════════════════════════╗");
     println!("║     Shop CLI — items.bin     ║");
@@ -241,6 +266,8 @@ fn main() {
         println!("  [2] Add item");
         println!("  [3] Edit item");
         println!("  [4] Delete item");
+        println!("  [5] View Sales History");
+        println!("  [6] Undo Sale");
         println!("  [q] Quit");
         let choice = prompt("\nChoice");
 
@@ -251,6 +278,8 @@ fn main() {
             "2" => add_item(&mut data),
             "3" => edit_item(&mut data),
             "4" => delete_item(&mut data),
+            "5" => list_sales(&data),
+            "6" => undo_sale(&mut data),
             "q" | "Q" => {
                 println!("  Bye!");
                 break;

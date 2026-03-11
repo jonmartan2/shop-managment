@@ -2,6 +2,21 @@ let currentItemId = null;
 let uploadedImageUrl = null;
 let allItems = []; // cache for search filtering
 
+// Dark Mode Support
+function initTheme() {
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme === "dark") {
+    document.body.classList.add("dark-mode");
+    document.getElementById("themeToggle").textContent = "☀️";
+  }
+}
+
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle("dark-mode");
+  localStorage.setItem("theme", isDark ? "dark" : "light");
+  document.getElementById("themeToggle").textContent = isDark ? "☀️" : "🌙";
+}
+
 function toggleSearch() {
   const box = document.getElementById("searchBox");
   box.classList.toggle("visible");
@@ -133,33 +148,63 @@ function openInfoModal(item) {
       <p>💰 المبيع: <span id="modalSold">${item.sold}</span></p>
       <p>💵 الإيرادات: $<span id="modalRevenue">${(item.sold * item.price).toFixed(2)}</span></p>
     </div>
-    <button class="sell-btn" onclick="sellOne(${item.id})" ${item.quantity === 0 ? "disabled" : ""}>
-      ${item.quantity === 0 ? "نفذ المخزون" : "بيع واحد 🛒"}
-    </button>
+    <div class="sell-actions">
+      <input type="number" id="sellQuantity" class="sell-qty-input" value="1" min="1" max="${item.quantity}">
+      <button class="sell-btn" onclick="performSell(${item.id})" ${item.quantity === 0 ? "disabled" : ""}>
+        ${item.quantity === 0 ? "نفذ المخزون" : "تأكيد البيع 🛒"}
+      </button>
+    </div>
     <button class="close-info-btn" onclick="closeInfoModal()">إغلاق</button>
   `;
 
   document.getElementById("infoModal").style.display = "flex";
 }
 
-async function sellOne(id) {
+async function performSell(id) {
+  const qtyInput = document.getElementById("sellQuantity");
+  const quantity = parseInt(qtyInput.value);
+
+  if (isNaN(quantity) || quantity <= 0) {
+    alert("يرجى إدخال كمية صحيحة");
+    return;
+  }
+
+  const item = allItems.find(i => i.id === id);
+  if (!item) return;
+
+  if (quantity > item.quantity) {
+    alert("الكمية المطلوبة أكبر من المخزون المتوفر");
+    return;
+  }
+
+  if (!confirm(`هل أنت متأكد من بيع ${quantity} من "${item.name}"؟`)) {
+    return;
+  }
+
   try {
-    const response = await fetch(`/items/${id}/sell`, { method: "POST" });
+    const response = await fetch(`/items/${id}/sell`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity })
+    });
 
     if (response.ok) {
       await fetchAndRenderItems();
 
       if (currentItemId === id) {
-        const item = allItems.find(i => i.id === id);
-        if (item) {
-          document.getElementById("modalQuantity").textContent = item.quantity;
-          document.getElementById("modalSold").textContent = item.sold;
-          document.getElementById("modalRevenue").textContent = (item.sold * item.price).toFixed(2);
+        const updatedItem = allItems.find(i => i.id === id);
+        if (updatedItem) {
+          document.getElementById("modalQuantity").textContent = updatedItem.quantity;
+          document.getElementById("modalSold").textContent = updatedItem.sold;
+          document.getElementById("modalRevenue").textContent = (updatedItem.sold * updatedItem.price).toFixed(2);
 
           const sellBtn = document.querySelector(".sell-btn");
-          if (item.quantity === 0) {
+          const qtyInputModal = document.getElementById("sellQuantity");
+          qtyInputModal.max = updatedItem.quantity;
+          if (updatedItem.quantity === 0) {
             sellBtn.textContent = "نفذ المخزون";
             sellBtn.disabled = true;
+            qtyInputModal.disabled = true;
           }
         }
       }
@@ -227,5 +272,6 @@ document.addEventListener("keydown", (e) => {
 });
 
 window.onload = function () {
+  initTheme();
   fetchAndRenderItems();
 };
